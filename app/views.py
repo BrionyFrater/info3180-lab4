@@ -1,6 +1,6 @@
 import os
 from app import app, db, login_manager
-from flask import render_template, request, redirect, url_for, flash, session, abort
+from flask import render_template, request, redirect, send_from_directory, url_for, flash, session, abort
 from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.utils import secure_filename
 from werkzeug.security import check_password_hash
@@ -12,6 +12,18 @@ from app.forms import LoginForm, UploadForm
 ###
 # Routing for your application.
 ###
+
+
+def get_uploaded_images():
+    uploaded_images = []
+
+    rootdir = os.path.join(app.config['UPLOAD_FOLDER'])
+    for subdir, dirs, files in os.walk(rootdir):
+        for file in files:
+            file_extension = os.path.splitext(file)
+            if file_extension[1].lower() in ['.png', '.jpg']:
+                uploaded_images.append(os.path.join(file))
+    return uploaded_images
 
 @app.route('/')
 def home():
@@ -40,11 +52,21 @@ def upload():
             app.config['UPLOAD_FOLDER'], filename
         ))
         
+        get_uploaded_images()
 
         flash('File Saved', 'success')
         return redirect(url_for('home')) # Update this to redirect the user to a route that displays all uploaded image files
 
     return render_template('upload.html', form=form)
+
+@app.route('/uploads/<filename>')
+def get_image(filename):
+    return send_from_directory(os.path.join(os.getcwd(), app.config['UPLOAD_FOLDER']), filename)
+
+@app.route('/files')
+@login_required
+def files():
+    return render_template('files.html', uploads=get_uploaded_images())
 
 
 @app.route('/login', methods=['POST', 'GET'])
@@ -83,6 +105,7 @@ def login():
 @login_manager.user_loader
 def load_user(id):
     return db.session.execute(db.select(UserProfile).filter_by(id=id)).scalar()
+
 
 ###
 # The functions below should be applicable to all Flask apps.
